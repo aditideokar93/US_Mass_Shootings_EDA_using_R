@@ -1,0 +1,249 @@
+---
+title: "US_Mass_shootings"
+author: "Aditi Deokar"
+date: "1/10/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning = FALSE)
+```
+## DATASET DESCRIPTION
+
+### Source-
+  * https://www.motherjones.com/politics/2012/12/mass-shootings-mother-jones-full-data/
+  
+### Background-
+  * Since 1982, there have been at least 117 public mass shootings across the country, with the killings unfolding in 35 states, from Massachusetts to Hawaii.
+  * They are occurring more often: An analysis of this database by researchers at Harvard University, further corroborated by a different study from the FBI, determined that mass shootings have tripled in frequency in recent years.
+  
+### Dataset-
+  * The dataset contains detailed information of mass shootings from the year 1982 to 2019.
+  * No. of columns= 24
+  * No. of rows= 118
+  * Variables- case,location,date,summary,fatalities,injured,total_victims,location,age_of_shooter,prior_signs_mental_health_issues, mental_health_details,weapons_obtained_legally,where_obtained,weapon_type,weapon_details,race,gender,sources,mental_health_sources, sources_additional_age,latitude,longitude,type,year
+
+### Characteristics-
+  * Number of categorical data columns:18
+  * Number of numerical data columns:6
+
+### Reference-
+  * https://www.kaggle.com/denisafonin/data-cleaning-and-dealing-with-missing-values/#data
+  
+### IMPORT LIBRARIES
+
+```{r}
+library(tibble) 
+library(lubridate)
+library(tidyr)
+library(stringr)
+library(ggmap)
+library(RColorBrewer)
+```	
+
+### IMPORT DATA
+```{r}
+
+  mass_shootings<-read.csv("Assignment1-Deokar-US_Mass_Shootings.csv", stringsAsFactors = FALSE)
+```
+
+### EXPLORE DATA
+```{r}
+
+glimpse(mass_shootings)
+
+```	
+
+```{r}
+summary(mass_shootings) #displays summary statistics for numeric variables
+```
+
+### *Obervations:*
+  * Date, age_of_shooter variable’s class is to be transformed to correct data type
+  * Total victims: There is a strange distribution - Max is huge compared to the 3rd quartile. Mean is 2 times higher than median which implies that the distribution is skewed towards the upper limit.
+  * Fatalities and Injured variables are the subsets of Total victims variable and have the same issue.
+
+## CLEANING DATA
+
+### *Untidy data:*
+  * The dataset has a column named “location” which contains the “City” and “State” together separated by “,” where the shootings have taken place. This indicates an untidy data since cities and states should have different columns in order to see the distribution of mass shootings over cities or states.
+  * To convert this untidy data to tidy data, we need to separate “Location” column into two different columns named “City” and “State”
+  
+### *Separating Location to “City” and “State”:*
+
+```{r }
+head(mass_shootings$location, n=20)
+
+mass_shootings <- separate(mass_shootings, location, c("City", "State"), sep = ",", remove=FALSE)
+
+#erase blank spaces from the beginning and end of each state name
+mass_shootings$State<-str_trim(mass_shootings$State)
+```
+
+
+### *Tidy Data:*
+```{r }
+my_data <- as_tibble(mass_shootings)
+#my_data %>% select(location:State)
+my_data %>% dplyr::select(location:State)
+```
+
+### *Changing multiple column names*
+
+```{r}
+colnames(mass_shootings)[colnames(mass_shootings) %in% c("age_of_shooter","location.1","prior_signs_mental_health_issues")] <- c("age", "type_of_location","mental_health_issues")
+
+#summary(mass_shootings)
+```
+
+### *Changing Date variable to date type*
+```{r}
+mass_shootings$date<-mdy(mass_shootings$date)
+```
+
+### *Changing Age variable to numeric type*
+
+```{r}
+mass_shootings$age<-as.numeric(mass_shootings$age,message=FALSE, warning=FALSE)
+#summary(mass_shootings)
+```
+
+### *Changing “mental_health_issues”, “race”, “gender” columns’ classes to factors*
+```{r}
+
+cols_to_factors<-c("mental_health_issues", "race", "gender")
+mass_shootings[,cols_to_factors]<-lapply(mass_shootings[,cols_to_factors], as.factor)
+```
+
+### *Standardize levels for “gender”, “race” and “mental_health_issues”:*
+
+### *Gender:*
+```{r}
+
+levels(mass_shootings$gender)
+levels(mass_shootings$gender)[levels(mass_shootings$gender)=="M"] <- "Male"
+levels(mass_shootings$gender)[levels(mass_shootings$gender)=="F"] <- "Female"
+levels(mass_shootings$gender)[levels(mass_shootings$gender)=="Male & Female"] <- "Male/Female"
+levels(mass_shootings$gender)[levels(mass_shootings$gender)=="-"] <- "Unknown"
+
+levels(mass_shootings$gender)
+table(mass_shootings$gender)
+nlevels(mass_shootings$gender)
+sum(table(mass_shootings$gender))==nrow(mass_shootings)
+
+#plot(mass_shootings$gender,ylim = c(0,140))
+coul <- brewer.pal(4, "Set3")
+barplot(table(mass_shootings$gender),
+main="No. of shootings based on shooter's gender",
+xlab="Gender",
+ylab="Count",ylim = c(0,120),
+col = coul
+)
+legend("topleft",
+c("Unknown","Female","Male","Male/Female"),
+fill = coul
+)
+```
+
+### *Observations-*
+  * The above graph shows that male shooters were responsible for majority of the mass shootings(i.e. 95% of the shootings)
+  
+### *Race:*
+```{r}
+
+levels(mass_shootings$race)
+levels(mass_shootings$race)[levels(mass_shootings$race)=="-"]<-"Unknown"
+levels(mass_shootings$race)[levels(mass_shootings$race)=="black"
+                            |levels(mass_shootings$race)=="Black"]<-"Black American"
+levels(mass_shootings$race)[levels(mass_shootings$race)=="white"
+                            |levels(mass_shootings$race)=="white"
+                            |levels(mass_shootings$race)=="White"
+                            |levels(mass_shootings$race)=="White "]<-"White American"
+levels(mass_shootings$race)[levels(mass_shootings$race)=="unclear"]<-"Unknown"                           
+levels(mass_shootings$race)[levels(mass_shootings$race)=="Native American"]<-"Native American"
+
+table(mass_shootings$race)
+```
+
+### *Mental Health Issues:  *
+```{r}
+levels(mass_shootings$mental_health_issues)
+
+levels(mass_shootings$mental_health_issues)[levels(mass_shootings$mental_health_issues)=="Unclear " |levels(mass_shootings$mental_health_issues)=="Unclear"   |levels(mass_shootings$mental_health_issues)=="unknown" | levels(mass_shootings$mental_health_issues)=="-"]<-"Unknown"
+
+levels(mass_shootings$mental_health_issues)[levels(mass_shootings$mental_health_issues)=="yes"
+                            |levels(mass_shootings$mental_health_issues)=="Yes"]<-"Yes"
+                            
+levels(mass_shootings$mental_health_issues)
+
+table(mass_shootings$mental_health_issues)
+
+#plot(mass_shootings$mental_health_issues,ylim = c(0,70))
+library(RColorBrewer)
+coul <- brewer.pal(4, "Set2")
+barplot(table(mass_shootings$mental_health_issues),
+main="Count of cases on the basis of mental health issue of shooter",
+xlab="Mental Health Issues",
+ylab="Count",ylim = c(0,100),
+col = coul
+)
+legend("topleft",
+c("Unknown","No","TBD","Yes"),
+fill = coul)
+```
+
+### *Observations-*
+  * The above graph shows that more than 50% of the shooters suffered through mental health issues.
+
+## *Standardize State names:*
+```{r}
+
+mass_shootings$State<-as.factor(mass_shootings$State)
+levels(mass_shootings$State)
+
+#Creating a data frame of all states with abbreviations:
+st.codes<-data.frame(
+  state=(c("AK", "AL", "AR", "AZ", "CA", "CO", "CT", "DC", "DE", "FL", "GA",
+                    "HI", "IA", "ID", "IL", "IN", "KS", "KY", "LA", "MA", "MD", "ME",
+                    "MI", "MN", "MO", "MS",  "MT", "NC", "ND", "NE", "NH", "NJ", "NM",
+                    "NV", "NY", "OH", "OK", "OR", "PA", "PR", "RI", "SC", "SD", "TN",
+                    "TX", "UT", "VA", "VT", "WA", "WI", "WV", "WY")),
+  full=(c("alaska","alabama","arkansas","arizona","california","colorado",
+                   "connecticut","district of columbia","delaware","florida","georgia",
+                   "hawaii","iowa","idaho","illinois","indiana","kansas","kentucky",
+                   "louisiana","massachusetts","maryland","maine","michigan","minnesota",
+                   "missouri","mississippi","montana","north carolina","north dakota",
+                   "nebraska","new hampshire","new jersey","new mexico","nevada",
+                   "new york","ohio","oklahoma","oregon","pennsylvania","puerto rico",
+                   "rhode island","south carolina","south dakota","tennessee","texas",
+                   "utah","virginia","vermont","washington","wisconsin",
+                   "west virginia","wyoming")), stringsAsFactors = FALSE)
+
+# Standardizing state names using the data frame "st.codes":
+matched_states<-match(mass_shootings$State, st.codes$state)
+
+mass_shootings[which(!is.na(matched_states)), "State"]<-st.codes$full[match(mass_shootings$State[which(!is.na(matched_states))], st.codes$state)]
+mass_shootings$State<-tolower(mass_shootings$State)
+
+#Adding the State Abbreviation column:
+mass_shootings$State_Abbr <- sapply(mass_shootings$State, function(x) st.codes$state[match(x, st.codes$full)])
+
+mass_shootings[,c("State", "State_Abbr")]<-lapply(mass_shootings[,c("State", "State_Abbr")], as.factor)
+
+```
+
+### *Plotting the distribution of shootings over the years in various states according to shooting type*
+
+```{r}
+ggplot(data = mass_shootings) +
+geom_point(mapping = aes(x = year, y = State, color = type))+
+  labs(title="Distribution of shootings")
+
+```
+
+### *Observations-*
+  * The above scatter plot shows that the number of mass shootings in USA increased over the last decade in states like California, Colorado, Florida, Texas, Washington, Ohio.
+
